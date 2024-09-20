@@ -12,7 +12,7 @@ import css from "./App.module.css";
 export default function App() {
   const [pictures, setPictures] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null); 
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [totalPages, setTotalPages] = useState(0);
@@ -21,46 +21,48 @@ export default function App() {
   const lastPictureRef = useRef(null);
   const searchBarRef = useRef(null);
 
+  
+  useEffect(() => {
+    if (!query) return; 
+
+    const fetchPictures = async () => {
+      try {
+        setLoading(true);
+        setError(null); 
+
+        const data = await fetchPicturesWithQuery(query, page);
+        if (data.results.length === 0) {
+          throw new Error("noimage"); 
+        }
+
+        setPictures((prevPictures) =>
+          page === 1 ? data.results : [...prevPictures, ...data.results]
+        );
+        setTotalPages(data.total_pages);
+      } catch (e) {
+        setError(e.message === "noimage" ? "No images found" : "Failed to fetch data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPictures();
+  }, [query, page]); 
+
   useEffect(() => {
     if (!loading && lastPictureRef.current) {
       lastPictureRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [pictures, loading]);
 
-  const handleSearch = async (newQuery) => {
-    try {
-      setPictures([]);
-      setError(false);
-      setLoading(true);
-      setQuery(newQuery);
-      setPage(1);
-      const data = await fetchPicturesWithQuery(newQuery, 1);
-      if (data.results.length !== 0) {
-        setPictures(data.results);
-        setTotalPages(data.total_pages);
-      } else {
-        throw "noimage";
-      }
-    } catch (e) {
-      console.log(e);
-      e==="noimage"? setError("noimage") : setError("wrong");
-        } finally {
-      setLoading(false);
-    }
+  const handleSearch = (newQuery) => {
+    setQuery(newQuery);
+    setPage(1); 
+    setPictures([]); 
   };
 
-  const loadMorePictures = async () => {
-    try {
-      setLoading(true);
-      const nextPage = page + 1;
-      const data = await fetchPicturesWithQuery(query, nextPage);
-      setPictures((prevPictures) => [...prevPictures, ...data.results]);
-      setPage(nextPage);
-    } catch (e) {
-      setError("wrong");
-    } finally {
-      setLoading(false);
-    }
+  const loadMorePictures = () => {
+    setPage((prevPage) => prevPage + 1); 
   };
 
   const openModal = (imageData) => {
@@ -79,8 +81,7 @@ export default function App() {
     }
   };
 
-  const shouldShowLoadMore =
-    pictures.length > 0 && page < totalPages && !loading;
+  const shouldShowLoadMore = pictures.length > 0 && page < totalPages && !loading;
 
   return (
     <div className={css.container}>
@@ -94,7 +95,7 @@ export default function App() {
       )}
       {shouldShowLoadMore && <LoadMoreBtn onClick={loadMorePictures} />}
       {loading && <Loader />}
-      { (error !== "") ?  <ErrorMessage error={error} /> : null}
+      {error && <ErrorMessage error={error} />}
       <button onClick={scrollToTop} className={css.scrollBtn}>
         <IoArrowUpCircleSharp className={css.reactIcons} />
       </button>
